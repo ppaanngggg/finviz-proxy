@@ -37,22 +37,14 @@ func parseKeyValuePairs(str string) map[string]string {
 	return keyValuePairs
 }
 
-func parseFilterNameAndDescription(td *goquery.Selection) (name string, description string) {
+func parseFilterNameAndDescription(span *goquery.Selection) (name string, description string) {
 	/*
-		<td width="10%" align="center">
-		    <span class="screener-combo-title"
-		          style="cursor:pointer;"
-		          data-boxover="cssbody=[tooltip_bdy] cssheader=[tooltip_hdr] header=[Exchange] body=[<table width=300><tr><td class='tooltip_tab'>Stock Exchange at which a stock is listed.</td></tr></table>] delay=[500]">
-		        Exchange
-		    </span>
-		</td>
+	   <span class="screener-combo-title"
+	         style="cursor:pointer;"
+	         data-boxover="cssbody=[tooltip_bdy] cssheader=[tooltip_hdr] header=[Exchange] body=[<table width=300><tr><td class='tooltip_tab'>Stock Exchange at which a stock is listed.</td></tr></table>] delay=[500]">
+	       Exchange
+	   </span>
 	*/
-	span := td.Find("span").First()
-	if span == nil || span.Length() == 0 {
-		html, err := td.Html()
-		logrus.WithField("td", html).WithField("err", err).Warning("span not found in td")
-		return
-	}
 	dataBoxover, exist := span.Attr("data-boxover")
 	if !exist {
 		html, err := span.Html()
@@ -79,7 +71,7 @@ func parseFilterNameAndDescription(td *goquery.Selection) (name string, descript
 	if errlog.Debug(err) {
 		return
 	}
-	td = doc.Find("td").First()
+	td := doc.Find("td").First()
 	if td == nil || td.Length() == 0 {
 		logrus.WithField("body", body).Warning("td not found in body")
 		return
@@ -88,13 +80,7 @@ func parseFilterNameAndDescription(td *goquery.Selection) (name string, descript
 	return
 }
 
-func parseFilterOptions(td *goquery.Selection) []FilterOption {
-	selection := td.Find("select").First()
-	if selection == nil || selection.Length() == 0 {
-		html, err := td.Html()
-		logrus.WithField("td", html).WithField("err", err).Warning("select not found in td")
-		return nil
-	}
+func parseFilterOptions(selection *goquery.Selection) []FilterOption {
 	/*
 		<select id="fs_exch" style="width: 100%; visibility: visible;"
 		        class="screener-combo-text" onchange="ScreenerSelectOnChange(this)"
@@ -118,13 +104,15 @@ func parseFilterOptions(td *goquery.Selection) []FilterOption {
 	// iter options of select
 	options := make([]FilterOption, 0)
 	selection.Find("option").Each(func(i int, option *goquery.Selection) {
+		// <option value="amex">AMEX</option>
 		name := option.Text()
-		value := option.AttrOr("value", "")
-		if value == "" || value == "model" { // ignore Any and Custom (Elite only)
-			options = append(options, FilterOption{
-				Name: name, Value: prefix + "_" + value,
-			})
+		if name == "Any" || name == "Custom (Elite only)" { // ignore Any and Custom (Elite only)
+			return
 		}
+		value := option.AttrOr("value", "")
+		options = append(options, FilterOption{
+			Name: name, Value: prefix + "_" + value,
+		})
 	})
 	return options
 }
@@ -149,36 +137,32 @@ func fetchFilters() ([]Filter, error) {
 	if errlog.Debug(err) {
 		return nil, err
 	}
-	tbody := doc.Find("#filter-table-filters > tbody").First()
-	if tbody == nil || tbody.Length() == 0 {
-		logrus.Error("tbody not found")
-		return nil, errors.New("tbody not found")
+	table := doc.Find("table#filter-table-filters").First()
+	if table == nil || table.Length() == 0 {
+		logrus.Error("table not found")
+		return nil, errors.New("table not found")
 	}
 	// parse filters, each filter is a meta and an option
-	metaTds := make([]*goquery.Selection, 0)
-	optionsTds := make([]*goquery.Selection, 0)
-	tbody.Find("tr").Each(func(i int, tr *goquery.Selection) {
-		tr.Find("td").Each(func(j int, td *goquery.Selection) {
-			switch j % 2 {
-			case 0:
-				metaTds = append(metaTds, td)
-			case 1:
-				optionsTds = append(optionsTds, td)
-			}
-		})
+	spans := make([]*goquery.Selection, 0)
+	selections := make([]*goquery.Selection, 0)
+	table.Find("span.screener-combo-title").Each(func(i int, span *goquery.Selection) {
+		spans = append(spans, span)
 	})
-	if len(metaTds) != len(optionsTds) {
-		logrus.Error("len(metaTds) != len(optionsTds)")
-		return nil, errors.New("len(metaTds) != len(optionsTds)")
+	table.Find("select.screener-combo-text").Each(func(i int, selection *goquery.Selection) {
+		selections = append(selections, selection)
+	})
+	if len(spans) != len(selections) {
+		logrus.Error("len(spans) != len(selections)")
+		return nil, errors.New("len(spans) != len(selections)")
 	}
 	filters := make([]Filter, 0)
-	// parse meta and optionsTds to get filters
-	for i := 0; i < len(metaTds); i++ {
-		metaTd := metaTds[i]
-		optionTd := optionsTds[i]
-		name, description := parseFilterNameAndDescription(metaTd)
+	// parse meta and selections to get filters
+	for i := 0; i < len(spans); i++ {
+		span := spans[i]
+		selection := selections[i]
+		name, description := parseFilterNameAndDescription(span)
 		if name != "" {
-			options := parseFilterOptions(optionTd)
+			options := parseFilterOptions(selection)
 			if len(options) > 0 {
 				logrus.WithField("Index", i).
 					WithField("Name", name).
