@@ -4,11 +4,15 @@ go 1.20
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
+	github.com/go-chi/chi/v5 v5.0.10
+	github.com/go-chi/render v1.0.3
+	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/snwfdhmp/errlog v0.0.0-20230627145903-cdffd0ba9ea9
 )
 
 require (
+	github.com/ajg/form v1.5.1 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
