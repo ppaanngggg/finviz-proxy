@@ -27,9 +27,15 @@ type Sorter struct {
 	Value string `json:"value"`
 }
 
+type Signal struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type Params struct {
 	Filters []Filter `json:"filters"`
 	Sorters []Sorter `json:"sorters"`
+	Signals []Signal `json:"signals"`
 }
 
 func parseKeyValuePairs(str string) map[string]string {
@@ -46,6 +52,21 @@ func parseKeyValuePairs(str string) map[string]string {
 	}
 
 	return keyValuePairs
+}
+
+func parseUrlParams(str string) map[string]string {
+	// screener.ashx?v=111&ft=4&o=tickersfilter
+	urlParams := make(map[string]string)
+	if strings.Contains(str, "?") {
+		str = strings.Split(str, "?")[1]
+		for _, param := range strings.Split(str, "&") {
+			pair := strings.Split(param, "=")
+			if len(pair) == 2 {
+				urlParams[pair[0]] = pair[1]
+			}
+		}
+	}
+	return urlParams
 }
 
 func parseFilterNameAndDescription(span *goquery.Selection) (name string, description string) {
@@ -176,11 +197,43 @@ func parseSorters(doc *goquery.Document) ([]Sorter, error) {
 	sorters := make([]Sorter, 0)
 	doc.Find("select#orderSelect option").Each(func(i int, option *goquery.Selection) {
 		name := option.Text()
-		sorters = append(sorters, Sorter{
-			Name: name,
-		})
+		value, exists := option.Attr("value")
+		if !exists {
+			return
+		}
+		params := parseUrlParams(value)
+		value = params["o"]
+		if value != "" {
+			sorters = append(sorters, Sorter{
+				Name:  name,
+				Value: value,
+			})
+		}
 	})
 	return sorters, nil
+}
+
+func parseSignals(doc *goquery.Document) ([]Signal, error) {
+	signals := make([]Signal, 0)
+	doc.Find("select#signalSelect option").Each(func(i int, option *goquery.Selection) {
+		name := option.Text()
+		if name == "None (all stocks)" {
+			return
+		}
+		value, exists := option.Attr("value")
+		if !exists {
+			return
+		}
+		params := parseUrlParams(value)
+		value = params["s"]
+		if value != "" {
+			signals = append(signals, Signal{
+				Name:  name,
+				Value: value,
+			})
+		}
+	})
+	return signals, nil
 }
 
 func fetchParams(ctx context.Context) (*Params, error) {
@@ -205,7 +258,7 @@ func fetchParams(ctx context.Context) (*Params, error) {
 	// html, _ := ioutil.ReadAll(resp.Body)
 	// ioutil.WriteFile("screener.ashx.html", html, 0644)
 
-	// parse params from page
+	// parse globalParams from page
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if errlog.Debug(err) {
 		return nil, err
@@ -219,6 +272,10 @@ func fetchParams(ctx context.Context) (*Params, error) {
 	params.Sorters, err = parseSorters(doc)
 	if errlog.Debug(err) {
 		return nil, err
+	}
+	params.Signals, err = parseSignals(doc)
+	if errlog.Debug(err) {
+
 	}
 	return params, nil
 }

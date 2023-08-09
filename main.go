@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
@@ -15,6 +16,27 @@ type config struct {
 	LogColor bool          `default:"true"`
 	Timeout  time.Duration `default:"60s"`
 	Throttle int           `default:"100"`
+}
+
+var globalParams *Params
+
+func init() {
+	var err error
+	globalParams, err = fetchParams(context.Background())
+	if errlog.Debug(err) {
+		panic(err)
+	}
+	go func() {
+		for {
+			time.Sleep(time.Hour)
+			params, err := fetchParams(context.Background())
+			if errlog.Debug(err) {
+				continue
+			} else {
+				globalParams = params
+			}
+		}
+	}()
 }
 
 func main() {
@@ -35,14 +57,9 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	r.Get("/params", func(w http.ResponseWriter, r *http.Request) {
-		params, err := fetchParams(r.Context())
-		if err != nil {
-			logrus.Error(err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		render.JSON(w, r, params)
+		render.JSON(w, r, globalParams)
 	})
 
+	logrus.Infof("Listening on :8000")
 	http.ListenAndServe(":8000", r)
 }
