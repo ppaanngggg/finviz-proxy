@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/sirupsen/logrus"
 	"github.com/snwfdhmp/errlog"
-	"net/http"
 	"regexp"
 	"strings"
 )
@@ -237,33 +237,16 @@ func parseSignals(doc *goquery.Document) ([]Signal, error) {
 }
 
 func fetchParams(ctx context.Context) (*Params, error) {
-	// request page
-	req, err := http.NewRequestWithContext(
-		ctx, http.MethodGet, "https://finviz.com/screener.ashx?ft=4", nil,
-	)
-	if errlog.Debug(err) {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "curl/7.88.1")
-	resp, err := http.DefaultClient.Do(req)
-	if errlog.Debug(err) {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		logrus.Error("status code not ok")
-		return nil, errors.New("status code not ok")
-	}
-	// save html for development
-	// html, _ := ioutil.ReadAll(resp.Body)
-	// ioutil.WriteFile("screener.ashx.html", html, 0644)
-
-	// parse globalParams from page
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	page, err := fetchFinvizPage(ctx, "ft=4")
 	if errlog.Debug(err) {
 		return nil, err
 	}
 
+	// parse params from page
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(page))
+	if errlog.Debug(err) {
+		return nil, err
+	}
 	params := &Params{}
 	params.Filters, err = parseFilters(doc)
 	if errlog.Debug(err) {
@@ -275,7 +258,7 @@ func fetchParams(ctx context.Context) (*Params, error) {
 	}
 	params.Signals, err = parseSignals(doc)
 	if errlog.Debug(err) {
-
+		return nil, err
 	}
 	return params, nil
 }
