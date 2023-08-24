@@ -106,12 +106,8 @@ func main() {
 	r.Get("/params", func(w http.ResponseWriter, r *http.Request) {
 		render.JSON(w, r, globalParams)
 	})
-	r.Post("/table", func(w http.ResponseWriter, r *http.Request) {
-		params := &TableParams{}
-		if err := render.DecodeJSON(r.Body, params); errlog.Debug(err) {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+	r.Get("/table", func(w http.ResponseWriter, r *http.Request) {
+		params := NewTableParams(r.URL.Query())
 		table, err := parseTable(r.Context(), params)
 		if errlog.Debug(err) {
 			w.WriteHeader(http.StatusInternalServerError)

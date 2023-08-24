@@ -18,6 +18,29 @@ type TableParams struct {
 	Filters []string `json:"filters"`
 }
 
+func NewTableParams(query map[string][]string) *TableParams {
+	params := &TableParams{}
+	if order, ok := query["order"]; ok {
+		if len(order) > 0 {
+			params.Order = order[0]
+		}
+	}
+	if desc, ok := query["desc"]; ok {
+		if len(desc) > 0 && (desc[0] == "1" || strings.ToLower(desc[0]) == "true") {
+			params.Desc = true
+		}
+	}
+	if signal, ok := query["signal"]; ok {
+		if len(signal) > 0 {
+			params.Signal = signal[0]
+		}
+	}
+	if filters, ok := query["filters"]; ok {
+		params.Filters = filters
+	}
+	return params
+}
+
 type Table struct {
 	Headers []string   `json:"headers"`
 	Rows    [][]string `json:"rows"`
