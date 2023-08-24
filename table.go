@@ -35,8 +35,10 @@ func NewTableParams(query map[string][]string) *TableParams {
 			params.Signal = signal[0]
 		}
 	}
-	if filters, ok := query["filters"]; ok {
-		params.Filters = filters
+	for k, v := range query {
+		if k == "filters" || strings.HasPrefix(k, "filters[") {
+			params.Filters = append(params.Filters, v...)
+		}
 	}
 	return params
 }
