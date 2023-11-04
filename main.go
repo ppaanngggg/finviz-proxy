@@ -3,16 +3,17 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sirupsen/logrus"
 	"github.com/snwfdhmp/errlog"
-	"io"
-	"net/http"
-	"os"
-	"time"
 )
 
 type config struct {
@@ -32,9 +33,15 @@ func init() {
 		panic(err)
 	}
 	// setup logger
-	logrus.SetFormatter(&logrus.TextFormatter{ForceColors: c.LogColor, FullTimestamp: true})
+	logrus.SetFormatter(
+		&logrus.TextFormatter{
+			ForceColors: c.LogColor, FullTimestamp: true,
+		},
+	)
 	middleware.DefaultLogger = middleware.RequestLogger(
-		&middleware.DefaultLogFormatter{Logger: logrus.StandardLogger(), NoColor: !c.LogColor},
+		&middleware.DefaultLogFormatter{
+			Logger: logrus.StandardLogger(), NoColor: !c.LogColor,
+		},
 	)
 	// fetch params
 	func() {
@@ -95,26 +102,32 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/download", func(w http.ResponseWriter, r *http.Request) {
-		html, err := fetchFinvizPage(r.Context(), "")
-		if errlog.Debug(err) {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		os.WriteFile("screener.ashx.html", html, 0644)
-	})
-	r.Get("/params", func(w http.ResponseWriter, r *http.Request) {
-		render.JSON(w, r, globalParams)
-	})
-	r.Get("/table", func(w http.ResponseWriter, r *http.Request) {
-		params := NewTableParams(r.URL.Query())
-		table, err := parseTable(r.Context(), params)
-		if errlog.Debug(err) {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		render.JSON(w, r, table)
-	})
+	r.Get(
+		"/download", func(w http.ResponseWriter, r *http.Request) {
+			html, err := fetchFinvizPage(r.Context(), "")
+			if errlog.Debug(err) {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			os.WriteFile("screener.ashx.html", html, 0644)
+		},
+	)
+	r.Get(
+		"/params", func(w http.ResponseWriter, r *http.Request) {
+			render.JSON(w, r, globalParams)
+		},
+	)
+	r.Get(
+		"/table", func(w http.ResponseWriter, r *http.Request) {
+			params := NewTableParams(r.URL.Query())
+			table, err := fetchPageAndParseTable(r.Context(), params)
+			if errlog.Debug(err) {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			render.JSON(w, r, table)
+		},
+	)
 
 	logrus.Infof("Listening on :8000")
 	http.ListenAndServe(":8000", r)

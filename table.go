@@ -3,12 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"strings"
+	"time"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 	"github.com/snwfdhmp/errlog"
-	"strings"
-	"time"
 )
 
 type TableParams struct {
@@ -85,7 +86,39 @@ func init() {
 	tableCache = cache.New(time.Minute, time.Minute)
 }
 
-func parseTable(ctx context.Context, params *TableParams) (*Table, error) {
+func parseTable(page []byte) (*Table, error) {
+	// parse table from page
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(page))
+	if errlog.Debug(err) {
+		return nil, err
+	}
+	// build table
+	table := &Table{}
+	thead := doc.Find("#screener-table").Find("thead")
+	thead.Find("th").Each(
+		func(i int, th *goquery.Selection) {
+			val, exists := th.Attr("class")
+			if exists && strings.Contains(val, "header") {
+				table.Headers = append(table.Headers, strings.TrimSpace(th.Text()))
+			}
+		},
+	)
+	tbody := thead.SiblingsFiltered("tbody")
+	tbody.Find("tr").Each(
+		func(i int, tr *goquery.Selection) {
+			buf := make([]string, 0, len(table.Headers))
+			tr.Find("td").Each(
+				func(i int, td *goquery.Selection) {
+					buf = append(buf, strings.TrimSpace(td.Text()))
+				},
+			)
+			table.Rows = append(table.Rows, buf)
+		},
+	)
+	return table, nil
+}
+
+func fetchPageAndParseTable(ctx context.Context, params *TableParams) (*Table, error) {
 	uri := buildUri(params)
 	// check cache
 	if table, found := tableCache.Get(uri); found {
@@ -96,26 +129,11 @@ func parseTable(ctx context.Context, params *TableParams) (*Table, error) {
 	if errlog.Debug(err) {
 		return nil, err
 	}
-	// parse table from page
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(page))
+	// parse table
+	table, err := parseTable(page)
 	if errlog.Debug(err) {
 		return nil, err
 	}
-
-	table := &Table{}
-	node := doc.Find("#screener-table .table-light")
-	node.Find("tr").Each(func(i int, tr *goquery.Selection) {
-		buf := make([]string, 0)
-		tr.Find("td").Each(func(j int, td *goquery.Selection) {
-			buf = append(buf, strings.TrimSpace(td.Text()))
-		})
-		if i == 0 {
-			table.Headers = buf
-		} else {
-			table.Rows = append(table.Rows, buf)
-		}
-	})
-
 	// cache table
 	tableCache.Set(uri, table, cache.DefaultExpiration)
 	return table, nil
