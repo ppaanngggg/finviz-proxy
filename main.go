@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +19,7 @@ import (
 
 type config struct {
 	LogColor bool          `default:"true"`
+	Port     int           `default:"8000"`
 	Timeout  time.Duration `default:"60s"`
 	Throttle int           `default:"100"`
 }
@@ -129,6 +131,7 @@ func main() {
 		},
 	)
 
-	logrus.Infof("Listening on :8000")
-	http.ListenAndServe(":8000", r)
+	addr := ":" + strconv.Itoa(c.Port)
+	logrus.Infof("Listening on " + addr)
+	http.ListenAndServe(addr, r)
 }
