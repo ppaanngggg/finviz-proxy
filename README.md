@@ -2,10 +2,6 @@
 
 Unoffical APT for Finviz screener application. Finviz has a great screener application. 
 
-You can use these APIs to finish:
-1. get all sorters, signals and filters for screener.
-2. fetch symbols according to your parameters.
-
 ## Usage
 
 1. simple run the `main.go` file, it will default listen on port 8000.
