@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/pkg/errors"
 	"strings"
 	"time"
 
@@ -19,10 +20,49 @@ type TableParams struct {
 	Filters []string `json:"filters"`
 }
 
-func NewTableParams(query map[string][]string) *TableParams {
+func checkSorter(order string) bool {
+	for _, sorter := range globalParams.Sorters {
+		if sorter.Value == order {
+			return true
+		}
+	}
+	return false
+}
+
+func checkSignal(signal string) bool {
+	for _, s := range globalParams.Signals {
+		if s.Value == signal {
+			return true
+		}
+	}
+	return false
+}
+
+func checkFilter(filter string) bool {
+	for _, f := range globalParams.Filters {
+		for _, o := range f.Options {
+			if o.Value == filter {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func NewTableParams(query map[string][]string) (*TableParams, error) {
+	for k := range query {
+		if k != "order" && k != "desc" && k != "signal" &&
+			k != "filters" && !strings.HasPrefix(k, "filters[") {
+			return nil, errors.Errorf("invalid query key: %s", k)
+		}
+	}
+
 	params := &TableParams{}
 	if order, ok := query["order"]; ok {
 		if len(order) > 0 {
+			if !checkSorter(order[0]) {
+				return nil, errors.Errorf("invalid order: %s", order[0])
+			}
 			params.Order = order[0]
 		}
 	}
@@ -33,15 +73,23 @@ func NewTableParams(query map[string][]string) *TableParams {
 	}
 	if signal, ok := query["signal"]; ok {
 		if len(signal) > 0 {
+			if !checkSignal(signal[0]) {
+				return nil, errors.Errorf("invalid signal: %s", signal[0])
+			}
 			params.Signal = signal[0]
 		}
 	}
 	for k, v := range query {
 		if k == "filters" || strings.HasPrefix(k, "filters[") {
+			for _, filter := range v {
+				if !checkFilter(filter) {
+					return nil, errors.Errorf("invalid filter: %s", filter)
+				}
+			}
 			params.Filters = append(params.Filters, v...)
 		}
 	}
-	return params
+	return params, nil
 }
 
 type Table struct {

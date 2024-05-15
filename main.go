@@ -121,7 +121,12 @@ func main() {
 	)
 	r.Get(
 		"/table", func(w http.ResponseWriter, r *http.Request) {
-			params := NewTableParams(r.URL.Query())
+			params, err := NewTableParams(r.URL.Query())
+			if errlog.Debug(err) {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				return
+			}
 			table, err := fetchPageAndParseTable(r.Context(), params)
 			if errlog.Debug(err) {
 				w.WriteHeader(http.StatusInternalServerError)
