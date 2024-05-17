@@ -1,6 +1,6 @@
 # finviz-proxy
 
-Unoffical APT for Finviz screener application. Finviz has a great screener application. 
+Finviz has a great screener application, but it is rendered by the server end with no exposed APIs. So I built this server to fetch pages from Finviz and parse them to extract useful content. And I hope it can help you with your financial research.
 
 ## Usage
 
