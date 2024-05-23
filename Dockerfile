@@ -7,7 +7,9 @@ WORKDIR /app
 ADD go.mod go.sum /app/
 RUN go mod download
 
-ADD *.go /app/
+ADD /pkg /app/pkg
+ADD /cmd /app/cmd
+
 RUN go build -o main .
 
 FROM alpine:3.18 AS final
