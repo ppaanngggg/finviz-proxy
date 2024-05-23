@@ -10,7 +10,7 @@ RUN go mod download
 ADD /pkg /app/pkg
 ADD /cmd /app/cmd
 
-RUN go build -o main .
+RUN go build -o main cmd/main/main.go
 
 FROM alpine:3.18 AS final
 
