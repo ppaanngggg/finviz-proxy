@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"github.com/patrickmn/go-cache"
 	"github.com/ppaanngggg/finviz-proxy/pkg"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,44 +13,34 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/sirupsen/logrus"
-	"github.com/snwfdhmp/errlog"
 )
 
 type config struct {
-	LogColor bool          `default:"true"`
 	Port     int           `default:"8000"`
 	Timeout  time.Duration `default:"60s"`
 	Throttle int           `default:"100"`
+	CacheTTL time.Duration `default:"60s"`
 }
 
 var (
 	c            config
 	globalParams *pkg.Params
+	tableCache   *cache.Cache
 )
 
 func init() {
 	// load config
-	if err := envconfig.Process("", &c); errlog.Debug(err) {
+	if err := envconfig.Process("", &c); err != nil {
 		panic(err)
 	}
-	// setup logger
-	logrus.SetFormatter(
-		&logrus.TextFormatter{
-			ForceColors: c.LogColor, FullTimestamp: true,
-		},
-	)
-	middleware.DefaultLogger = middleware.RequestLogger(
-		&middleware.DefaultLogFormatter{
-			Logger: logrus.StandardLogger(), NoColor: !c.LogColor,
-		},
-	)
+	// init cache
+	tableCache = cache.New(c.CacheTTL, c.CacheTTL)
 	// fetch params
 	func() {
 		ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
 		defer cancel()
 		params, err := pkg.FetchParams(ctx)
-		if errlog.Debug(err) {
+		if err != nil {
 			panic(err)
 		}
 		globalParams = params
@@ -57,11 +49,12 @@ func init() {
 		for {
 			time.Sleep(time.Hour)
 			func() {
-				logrus.Info("Fetching params...")
+				slog.Info("fetching params...")
 				ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
 				defer cancel()
 				params, err := pkg.FetchParams(ctx)
-				if errlog.Debug(err) {
+				if err != nil {
+					slog.Error("fetch params", "err", err)
 					return
 				}
 				globalParams = params
@@ -83,23 +76,49 @@ func main() {
 		},
 	)
 	r.Get(
-		"/table", func(w http.ResponseWriter, r *http.Request) {
+		"/filter", func(w http.ResponseWriter, r *http.Request) {
 			params, err := pkg.ParseTableParams(globalParams, r.URL.Query())
-			if errlog.Debug(err) {
+			if err != nil {
+				slog.Error("parse table params", "err", err)
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(err.Error()))
 				return
 			}
-			table, err := pkg.FetchPageAndParseTable(r.Context(), params)
-			if errlog.Debug(err) {
-				w.WriteHeader(http.StatusInternalServerError)
+			uri := params.BuildUri()
+			render.PlainText(w, r, uri)
+		},
+	)
+	r.Get(
+		"/table", func(w http.ResponseWriter, r *http.Request) {
+			params, err := pkg.ParseTableParams(globalParams, r.URL.Query())
+			if err != nil {
+				slog.Error("parse table params", "err", err)
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
 				return
 			}
+			uri := params.BuildUri()
+			slog.Info("to fetch page", "uri", uri)
+			// check cache
+			if table, found := tableCache.Get(uri); found {
+				render.JSON(w, r, table)
+				return
+			}
+			// fetch page and parse table
+			table, err := pkg.FetchPageAndParseTable(r.Context(), uri)
+			if err != nil {
+				slog.Error("fetch page and parse table", "err", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
+			}
+			// cache table
+			tableCache.Set(uri, table, cache.DefaultExpiration)
 			render.JSON(w, r, table)
 		},
 	)
 
 	addr := ":" + strconv.Itoa(c.Port)
-	logrus.Infof("Listening on " + addr)
+	slog.Info("Listening on", "addr", addr)
 	http.ListenAndServe(addr, r)
 }

@@ -10,14 +10,14 @@ Finviz has a great screener application, but it is rendered by the server end wi
 
 ## Envs
 
-1. `LOG_COLOR` default:"true", enable color log.
-2. `PORT` default:"8000", listen port.
-3. `TIMEOUT` default:"60s", http client timeout.
-4. `THROTTLE` default:"100", max concurrent request.
+1. `PORT` default:"8000", listen port.
+2. `TIMEOUT` default:"60s", http client timeout.
+3. `THROTTLE` default:"100", max concurrent request.
+4. `CACHE_TTL` default:"60s", table cache timeout.
 
 ## API
 
-### Get Parameters
+### 1. Get Parameters
 
 **Request:**
 
@@ -87,7 +87,23 @@ GET /params
 }
 ```
 
-### Get Table
+### 2. Get Filter
+
+Get the filter of Finviz. You can use any values from API `/params` to control your screener.
+
+**Request:**
+
+```http request
+GET /filter?order=company&desc=true&signal=ta_mostactive&filters[0]=exch_nasd&filters[1]=idx_sp500
+```
+
+**Response:**
+
+```text
+o=-company&s=ta_mostactive&f=exch_nasd,idx_sp500
+```
+
+### 3. Get Table
 
 **Request:**
 

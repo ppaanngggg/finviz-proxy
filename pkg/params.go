@@ -3,10 +3,9 @@ package pkg
 import (
 	"bytes"
 	"context"
-	"errors"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/sirupsen/logrus"
-	"github.com/snwfdhmp/errlog"
+	"github.com/pkg/errors"
+	"log/slog"
 	"regexp"
 	"strings"
 )
@@ -80,7 +79,7 @@ func parseFilterNameAndDescription(span *goquery.Selection) (name string, descri
 	dataBoxover, exist := span.Attr("data-boxover")
 	if !exist {
 		html, err := span.Html()
-		logrus.WithField("span", html).WithField("err", err).Warning("data-boxover not found in span")
+		slog.Warn("data-boxover not found in span", "span", html, "err", err)
 		return
 	}
 	m := parseKeyValuePairs(dataBoxover)
@@ -93,19 +92,20 @@ func parseFilterNameAndDescription(span *goquery.Selection) (name string, descri
 	// parse body to get description
 	body := m["body"]
 	if body == "" {
-		logrus.WithField("data-boxover", dataBoxover).Warning("body not found in data-boxover")
+		slog.Warn("body not found in data-boxover", "data-boxover", dataBoxover)
 		return
 	}
 	/*
 		<table width=300><tr><td class='tooltip_tab'>Stock Exchange at which a stock is listed.</td></tr></table>
 	*/
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("failed to parse body", "body", body, "err", err)
 		return
 	}
 	td := doc.Find("td").First()
 	if td == nil || td.Length() == 0 {
-		logrus.WithField("body", body).Warning("td not found in body")
+		slog.Warn("td not found in body", "body", body)
 		return
 	}
 	description = td.Text()
@@ -130,7 +130,7 @@ func parseFilterOptions(selection *goquery.Selection) []FilterOption {
 	prefix, exist := selection.Attr("data-filter")
 	if !exist {
 		html, err := selection.Html()
-		logrus.WithField("selection", html).WithField("err", err).Warning("data-filter not found in selection")
+		slog.Warn("data-filter not found in selection", "selection", html, "err", err)
 		return nil
 	}
 	// iter options of select
@@ -152,7 +152,7 @@ func parseFilterOptions(selection *goquery.Selection) []FilterOption {
 func parseFilters(doc *goquery.Document) ([]Filter, error) {
 	table := doc.Find("table#filter-table-filters").First()
 	if table == nil || table.Length() == 0 {
-		logrus.Error("table not found")
+		slog.Error("table not found")
 		return nil, errors.New("table not found")
 	}
 	// parse filters, each filter is a meta and an option
@@ -165,7 +165,7 @@ func parseFilters(doc *goquery.Document) ([]Filter, error) {
 		selections = append(selections, selection)
 	})
 	if len(spans) != len(selections) {
-		logrus.Error("len(spans) != len(selections)")
+		slog.Error("len(spans) != len(selections)", "len(spans)", len(spans), "len(selections)", len(selections))
 		return nil, errors.New("len(spans) != len(selections)")
 	}
 	filters := make([]Filter, 0)
@@ -177,11 +177,7 @@ func parseFilters(doc *goquery.Document) ([]Filter, error) {
 		if name != "" {
 			options := parseFilterOptions(selection)
 			if len(options) > 0 {
-				logrus.WithField("Index", i).
-					WithField("Name", name).
-					WithField("Description", description).
-					WithField("Options", options).
-					Debug("Filter Added")
+				slog.Debug("Filter Added", "Index", i, "Name", name, "Description", description, "Options", options)
 				filters = append(filters, Filter{
 					Name:        name,
 					Description: description,
@@ -238,26 +234,31 @@ func parseSignals(doc *goquery.Document) ([]Signal, error) {
 
 func FetchParams(ctx context.Context) (*Params, error) {
 	page, err := fetchFinvizPage(ctx, "ft=4")
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("failed to fetch page", "err", err)
 		return nil, err
 	}
 
 	// parse params from page
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(page))
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("failed to parse page", "err", err)
 		return nil, err
 	}
 	params := &Params{}
 	params.Filters, err = parseFilters(doc)
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("failed to parse filters", "err", err)
 		return nil, err
 	}
 	params.Sorters, err = parseSorters(doc)
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("failed to parse sorters", "err", err)
 		return nil, err
 	}
 	params.Signals, err = parseSignals(doc)
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("failed to parse signals", "err", err)
 		return nil, err
 	}
 	return params, nil

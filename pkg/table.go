@@ -3,14 +3,10 @@ package pkg
 import (
 	"bytes"
 	"context"
-	"github.com/pkg/errors"
-	"strings"
-	"time"
-
 	"github.com/PuerkitoBio/goquery"
-	"github.com/patrickmn/go-cache"
-	"github.com/sirupsen/logrus"
-	"github.com/snwfdhmp/errlog"
+	"github.com/pkg/errors"
+	"log/slog"
+	"strings"
 )
 
 type TableParams struct {
@@ -18,6 +14,36 @@ type TableParams struct {
 	Desc    bool     `json:"desc"`
 	Signal  string   `json:"signal"`
 	Filters []string `json:"filters"`
+}
+
+func (p *TableParams) BuildUri() string {
+	ret := ""
+	if p.Order != "" {
+		if p.Desc {
+			ret += "o=-" + p.Order
+		} else {
+			ret += "o=" + p.Order
+		}
+	}
+	if p.Signal != "" {
+		if ret != "" {
+			ret += "&"
+		}
+		ret += "s=" + p.Signal
+	}
+	if len(p.Filters) > 0 {
+		if ret != "" {
+			ret += "&"
+		}
+		ret += "f="
+		for i, filter := range p.Filters {
+			if i != 0 {
+				ret += ","
+			}
+			ret += filter
+		}
+	}
+	return ret
 }
 
 func checkSorter(allowParams *Params, order string) bool {
@@ -97,47 +123,11 @@ type Table struct {
 	Rows    [][]string `json:"rows"`
 }
 
-func buildUri(params *TableParams) string {
-	ret := ""
-	if params.Order != "" {
-		if params.Desc {
-			ret += "o=-" + params.Order
-		} else {
-			ret += "o=" + params.Order
-		}
-	}
-	if params.Signal != "" {
-		if ret != "" {
-			ret += "&"
-		}
-		ret += "s=" + params.Signal
-	}
-	if len(params.Filters) > 0 {
-		if ret != "" {
-			ret += "&"
-		}
-		ret += "f="
-		for i, filter := range params.Filters {
-			if i != 0 {
-				ret += ","
-			}
-			ret += filter
-		}
-	}
-	logrus.Infof("buildUri: %s", ret)
-	return ret
-}
-
-var tableCache *cache.Cache
-
-func init() {
-	tableCache = cache.New(time.Minute, time.Minute)
-}
-
 func parseTable(page []byte) (*Table, error) {
 	// parse table from page
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(page))
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("failed to parse table from page", "err", err)
 		return nil, err
 	}
 	// build table
@@ -166,23 +156,18 @@ func parseTable(page []byte) (*Table, error) {
 	return table, nil
 }
 
-func FetchPageAndParseTable(ctx context.Context, params *TableParams) (*Table, error) {
-	uri := buildUri(params)
-	// check cache
-	if table, found := tableCache.Get(uri); found {
-		return table.(*Table), nil
-	}
+func FetchPageAndParseTable(ctx context.Context, uri string) (*Table, error) {
 	// fetch page
 	page, err := fetchFinvizPage(ctx, uri)
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("failed to fetch page", "err", err)
 		return nil, err
 	}
 	// parse table
 	table, err := parseTable(page)
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("failed to parse table", "err", err)
 		return nil, err
 	}
-	// cache table
-	tableCache.Set(uri, table, cache.DefaultExpiration)
 	return table, nil
 }

@@ -2,10 +2,9 @@ package pkg
 
 import (
 	"context"
-	"errors"
-	"github.com/sirupsen/logrus"
-	"github.com/snwfdhmp/errlog"
+	"github.com/pkg/errors"
 	"io"
+	"log/slog"
 	"net/http"
 )
 
@@ -14,21 +13,24 @@ func fetchFinvizPage(ctx context.Context, params string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodGet, "https://finviz.com/screener.ashx?"+params, nil,
 	)
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("http new request", "err", err)
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "curl/7.88.1")
 	resp, err := http.DefaultClient.Do(req)
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("http do", "err", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		logrus.Error("status code not ok")
+		slog.Error("status code not ok", "code", resp.StatusCode)
 		return nil, errors.New("status code not ok")
 	}
 	page, err := io.ReadAll(resp.Body)
-	if errlog.Debug(err) {
+	if err != nil {
+		slog.Error("read all http resp body", "err", err)
 		return nil, err
 	}
 	return page, nil
