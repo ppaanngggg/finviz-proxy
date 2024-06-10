@@ -3,8 +3,10 @@ package pkg
 import (
 	"bytes"
 	"context"
+	"encoding/csv"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/pkg/errors"
+	"io"
 	"log/slog"
 	"strings"
 )
@@ -77,7 +79,7 @@ func checkFilter(allowParams *Params, filter string) bool {
 
 func ParseTableParams(allowParams *Params, query map[string][]string) (*TableParams, error) {
 	for k := range query {
-		if k != "order" && k != "desc" && k != "signal" &&
+		if k != "order" && k != "desc" && k != "signal" && k != "auth" &&
 			k != "filters" && !strings.HasPrefix(k, "filters[") {
 			return nil, errors.Errorf("invalid query key: %s", k)
 		}
@@ -168,6 +170,70 @@ func FetchPageAndParseTable(ctx context.Context, uri string) (*Table, error) {
 	if err != nil {
 		slog.Error("failed to parse table", "err", err)
 		return nil, err
+	}
+	return table, nil
+}
+
+type TableParamsWithAPIKey struct {
+	TableParams
+	ApiKey string `json:"apiKey"`
+}
+
+func ParseTableParamsWithAPIKey(allowParams *Params, query map[string][]string) (*TableParamsWithAPIKey, error) {
+	params, err := ParseTableParams(allowParams, query)
+	if err != nil {
+		return nil, err
+	}
+	// find apiKey from query
+	apiKeys, ok := query["auth"]
+	if !ok {
+		return nil, errors.New("apiKeys not found")
+	}
+	if len(apiKeys) == 0 {
+		return nil, errors.New("apiKeys is empty")
+	}
+	apiKey := apiKeys[0]
+	if apiKey == "" {
+		return nil, errors.New("apiKey is empty")
+	}
+	return &TableParamsWithAPIKey{
+		TableParams: *params,
+		ApiKey:      apiKey,
+	}, nil
+}
+
+func (p *TableParamsWithAPIKey) BuildUri() string {
+	ret := p.TableParams.BuildUri()
+	if ret != "" {
+		ret += "&"
+	}
+	ret += "auth=" + p.ApiKey
+	return ret
+}
+
+func ExportTable(ctx context.Context, uri string) (*Table, error) {
+	// fetch csv
+	csvBytes, err := fetchExportCSV(ctx, uri)
+	if err != nil {
+		slog.Error("failed to fetch csv", "err", err)
+		return nil, err
+	}
+	// parse table
+	r := csv.NewReader(bytes.NewReader(csvBytes))
+	table := &Table{}
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			slog.Error("failed to read csv", "err", err)
+		}
+		if len(table.Headers) == 0 {
+			table.Headers = record
+		} else {
+			table.Rows = append(table.Rows, record)
+		}
 	}
 	return table, nil
 }

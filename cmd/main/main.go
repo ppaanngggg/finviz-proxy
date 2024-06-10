@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/go-chi/chi/v5"
 	"github.com/patrickmn/go-cache"
 	"github.com/ppaanngggg/finviz-proxy/pkg"
 	"log/slog"
@@ -9,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/kelseyhightower/envconfig"
@@ -108,6 +108,35 @@ func main() {
 			table, err := pkg.FetchPageAndParseTable(r.Context(), uri)
 			if err != nil {
 				slog.Error("fetch page and parse table", "err", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
+			}
+			// cache table
+			tableCache.Set(uri, table, cache.DefaultExpiration)
+			render.JSON(w, r, table)
+		},
+	)
+	r.Get(
+		"/elite_table", func(w http.ResponseWriter, r *http.Request) {
+			params, err := pkg.ParseTableParamsWithAPIKey(globalParams, r.URL.Query())
+			if err != nil {
+				slog.Error("parse elite table params", "err", err)
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				return
+			}
+			uri := params.BuildUri()
+			slog.Info("to fetch elite table", "uri", uri)
+			// check cache
+			if table, found := tableCache.Get(uri); found {
+				render.JSON(w, r, table)
+				return
+			}
+			// fetch csv
+			table, err := pkg.ExportTable(r.Context(), uri)
+			if err != nil {
+				slog.Error("export table", "err", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte(err.Error()))
 				return
