@@ -8,7 +8,7 @@ import (
 )
 
 func Test_fetchFinvizPage(t *testing.T) {
-	html, err := fetchFinvizPage(context.Background(), "")
+	html, err := fetchFinvizPage(context.Background(), "", false)
 	assert.NoError(t, err)
 	os.WriteFile("screener.ashx", html, 0644)
 }

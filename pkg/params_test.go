@@ -9,7 +9,7 @@ import (
 )
 
 func Test_fetchParams(t *testing.T) {
-	params, err := FetchParams(context.Background())
+	params, err := FetchParams(context.Background(), false)
 	assert.NoError(t, err)
 	j, err := json.MarshalIndent(params, "", "  ")
 	assert.NoError(t, err)

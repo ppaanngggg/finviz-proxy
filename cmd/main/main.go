@@ -16,10 +16,13 @@ import (
 )
 
 type config struct {
-	Port     int           `default:"8000"`
-	Timeout  time.Duration `default:"60s"`
-	Throttle int           `default:"100"`
-	CacheTTL time.Duration `default:"60s"`
+	Port       int           `default:"8000"`
+	Timeout    time.Duration `default:"60s"`
+	Throttle   int           `default:"100"`
+	CacheTTL   time.Duration `default:"60s"`
+	EliteLogin bool          `default:"false"`
+	Email      string        `default:""`
+	Password   string        `default:""`
 }
 
 var (
@@ -35,11 +38,41 @@ func init() {
 	}
 	// init cache
 	tableCache = cache.New(c.CacheTTL, c.CacheTTL)
+	// elite login
+	if c.EliteLogin {
+		if c.Email == "" || c.Password == "" {
+			panic("email or password is empty")
+		}
+		ok, err := pkg.EliteLogin(context.Background(), c.Email, c.Password)
+		if err != nil {
+			panic(err)
+		}
+		if !ok {
+			panic("login failed")
+		}
+		slog.Info("login success")
+		go func() {
+			for {
+				time.Sleep(24 * time.Hour)
+				func() {
+					slog.Info("login...")
+					ok, err = pkg.EliteLogin(context.Background(), c.Email, c.Password)
+					if err != nil {
+						slog.Error("login err", "err", err)
+						return
+					}
+					if !ok {
+						slog.Error("login failed")
+						return
+					}
+					slog.Info("login success")
+				}()
+			}
+		}()
+	}
 	// fetch params
 	func() {
-		ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
-		defer cancel()
-		params, err := pkg.FetchParams(ctx)
+		params, err := pkg.FetchParams(context.Background(), c.EliteLogin)
 		if err != nil {
 			panic(err)
 		}
@@ -50,14 +83,13 @@ func init() {
 			time.Sleep(time.Hour)
 			func() {
 				slog.Info("fetching params...")
-				ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
-				defer cancel()
-				params, err := pkg.FetchParams(ctx)
+				params, err := pkg.FetchParams(context.Background(), c.EliteLogin)
 				if err != nil {
-					slog.Error("fetch params", "err", err)
+					slog.Error("fetch params err", "err", err)
 					return
 				}
 				globalParams = params
+				slog.Info("fetch params success")
 			}()
 		}
 	}()
@@ -105,7 +137,7 @@ func main() {
 				return
 			}
 			// fetch page and parse table
-			table, err := pkg.FetchPageAndParseTable(r.Context(), uri)
+			table, err := pkg.FetchPageAndParseTable(r.Context(), uri, c.EliteLogin)
 			if err != nil {
 				slog.Error("fetch page and parse table", "err", err)
 				w.WriteHeader(http.StatusInternalServerError)

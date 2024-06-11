@@ -158,9 +158,9 @@ func parseTable(page []byte) (*Table, error) {
 	return table, nil
 }
 
-func FetchPageAndParseTable(ctx context.Context, uri string) (*Table, error) {
+func FetchPageAndParseTable(ctx context.Context, uri string, isElite bool) (*Table, error) {
 	// fetch page
-	page, err := fetchFinvizPage(ctx, uri)
+	page, err := fetchFinvizPage(ctx, uri, isElite)
 	if err != nil {
 		slog.Error("failed to fetch page", "err", err)
 		return nil, err

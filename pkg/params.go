@@ -158,10 +158,17 @@ func parseFilters(doc *goquery.Document) ([]Filter, error) {
 	// parse filters, each filter is a meta and an option
 	spans := make([]*goquery.Selection, 0)
 	selections := make([]*goquery.Selection, 0)
-	table.Find("span.screener-combo-title").Each(func(i int, span *goquery.Selection) {
+	table.Find("td.filters-cells").Each(func(i int, td *goquery.Selection) {
+		span := td.Find("span.screener-combo-title").First()
+		if span == nil || span.Length() == 0 {
+			return
+		}
+		nextTd := td.Next()
+		selection := nextTd.Find("select.fv-select").First()
+		if selection == nil || selection.Length() == 0 {
+			return
+		}
 		spans = append(spans, span)
-	})
-	table.Find("select.screener-combo-text").Each(func(i int, selection *goquery.Selection) {
 		selections = append(selections, selection)
 	})
 	if len(spans) != len(selections) {
@@ -232,8 +239,8 @@ func parseSignals(doc *goquery.Document) ([]Signal, error) {
 	return signals, nil
 }
 
-func FetchParams(ctx context.Context) (*Params, error) {
-	page, err := fetchFinvizPage(ctx, "ft=4")
+func FetchParams(ctx context.Context, isElite bool) (*Params, error) {
+	page, err := fetchFinvizPage(ctx, "ft=4", isElite)
 	if err != nil {
 		slog.Error("failed to fetch page", "err", err)
 		return nil, err
