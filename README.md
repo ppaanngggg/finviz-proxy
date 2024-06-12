@@ -1,37 +1,51 @@
-# finviz-proxy
+# **Finviz Proxy**
 
-Finviz has a great screener application, but it is rendered by the server end with no exposed APIs. So I built this server to fetch pages from Finviz and parse them to extract useful content. And I hope it can help you with your financial research.
+🐳 **[Docker Hub](https://hub.docker.com/r/ppaanngggg/finviz-proxy) | 🐙 [RapidAPI](https://rapidapi.com/ppaanngggg/api/finviz-screener)**
 
-## Usage
+Finviz offers a fantastic screener application, but it lacks exposed APIs and is server-rendered. Therefore, I developed a server to fetch pages from Finviz and parse them to extract relevant information. I hope this can assist you in your financial research.
 
-1. simple run the `main.go` file, it will default listen on port 8000.
-2. use docker to run the image `ppaanngggg/finviz-proxy`.
-3. use my RapidAPI service, [finviz-screener](https://rapidapi.com/ppaanngggg/api/finviz-screener).
+👏 **Update 6/11/2024 - We now support login with your own [Elite](https://finviz.com/elite.ashx) account and can fetch Elite's real-time data.**
 
-## Envs
+## **Usage**
 
-1. `PORT` default:"8000", listen port.
-2. `TIMEOUT` default:"60s", http client timeout.
-3. `THROTTLE` default:"100", max concurrent request.
-4. `CACHE_TTL` default:"60s", table cache timeout.
+1. Simply run the `main.go` file. By default, it will listen on port 8000.
+2. Use Docker to run the image `docker run -p 8000:8000 ppaanngggg/finviz-proxy`.
+3. Utilize my RapidAPI service, [Finviz Screener](https://rapidapi.com/ppaanngggg/api/finviz-screener).
 
-## API
+## **Environments**
 
-### 1. Get Parameters
+### Serve Relative
+
+1. `PORT` (default: 8000) - the listening port.
+2. `TIMEOUT` (default: 60s) - this is the http client timeout.
+3. `THROTTLE` (default: 100) - this represents the maximum number of concurrent requests.
+4. `CACHETTL` (default: 60s) - this is the table cache timeout.
+
+### Elite Relative
+
+1. `ELITELOGIN` (default: false) - determines if Elite Account login is enabled.
+2. `EMAIL` (default: ) - email of your Elite Account.
+3. `PASSWORD` (default: ) - password of your Elite Account.
+
+## **API**
+
+### **1. Get Parameters**
 
 **Request:**
 
-```http request
-GET /params
+```bash
+# curl example
+curl localhost:8000/params
 ```
 
 **Response:**
 
-1. Sorters, decide how to sort result
-2. Signals, finviz defined signal filter
-3. Filters, all available filters of finviz screener
+1. `sorters` - determines the sorting method for results.
+2. `signals` - a special filter defined by Finviz for signals.
+3. `filters` - all available filters of the Finviz screener.
 
 ```json
+// output sample of `/params`
 {
 	"filters": [
 		{
@@ -42,7 +56,7 @@ GET /params
 					"name": "AMEX",
 					"value": "exch_amex"
 				},
-                ...
+        ...
 			]
 		},
 		{
@@ -52,10 +66,6 @@ GET /params
 				{
 					"name": "S&P 500",
 					"value": "idx_sp500"
-				},
-				{
-					"name": "NASDAQ 100",
-					"value": "idx_ndx"
 				},
 				...
 			]
@@ -67,10 +77,6 @@ GET /params
 			"name": "Ticker",
 			"value": "ticker"
 		},
-		{
-			"name": "Tickers Input Filter",
-			"value": "tickersfilter"
-		},
 		...
 	],
 	"signals": [
@@ -78,89 +84,75 @@ GET /params
 			"name": "Top Gainers",
 			"value": "ta_topgainers"
 		},
-		{
-			"name": "Top Losers",
-			"value": "ta_toplosers"
-		},
 		...
 	]
 }
 ```
 
-### 2. Get Filter
-
-Get the filter of Finviz. You can use any values from API `/params` to control your screener.
+### **2. Get Table**
 
 **Request:**
 
-```http request
-GET /filter?order=company&desc=true&signal=ta_mostactive&filters[0]=exch_nasd&filters[1]=idx_sp500
+Retrieve the screener table. You can use any `value` from the API response of `/params` to manage your `/table` response. The following are the available parameters:
+
+1. `order`: Select values from `sorters`. For example: `order=ticker`.
+2. `desc`: Set to `true` or `false` to control the sort order. For example, `desc=true`.
+3. `signal`: Select values from `signals`. For example, `signal=ta_topgainers`.
+4. `filters`: Filters offer various options and can accept multiple values. Select values from `filters`. For instance, use `filters=exch_nasd` for a single value or `filters=exch_nasd&filters=idx_sp500` for multiple filters.
+
+```bash
+# curl example
+curl 'localhost:8000/table?order=ticker&desc=true&signal=ta_topgainers&filters=exch_nasd&filters=idx_sp500'
 ```
 
 **Response:**
 
-```text
-o=-company&s=ta_mostactive&f=exch_nasd,idx_sp500
-```
-
-### 3. Get Table
-
-**Request:**
-
-Fetch the table of screener. You can use any values from API `/params` to control your screener.
-
-```http request
-GET /table?order=company&desc=true&signal=ta_mostactive&filters[0]=exch_nasd&filters[1]=idx_sp500
-```
-
-**Response:**
-
-1. `headers`, list of string, fetch from webpage's table;
-2. `rows`, list of tuple, each line is a ordered record from webpage's table;
+1. `headers`: A list of strings representing the headers fetched from a webpage's table.
+2. `rows`: A list of tuples, where each tuple is an ordered record fetched from a webpage's table.
 
 ```json
+// output example
 {
-	"headers": [
-		"No.",
-		"Ticker",
-		"Company",
-		"Sector",
-		"Industry",
-		"Country",
-		"Market Cap",
-		"P/E",
-		"Price",
-		"Change",
-		"Volume"
-	],
-	"rows": [
-		[
-			"1",
-			"AMD",
-			"Advanced Micro Devices, Inc.",
-			"Technology",
-			"Semiconductors",
-			"USA",
-			"171.55B",
-			"-",
-			"107.21",
-			"-2.03%",
-			"12,136,988"
-		],
-		[
-			"2",
-			"GOOG",
-			"Alphabet Inc.",
-			"Communication Services",
-			"Internet Content & Information",
-			"USA",
-			"1677.43B",
-			"30.39",
-			"133.40",
-			"0.14%",
-			"2,499,670"
-		],
-		...
-	]
+  "headers": [
+    "No.",
+    "Ticker",
+    "Company",
+    "Sector",
+    "Industry",
+    "Country",
+    "Market Cap",
+    "P/E",
+    "Price",
+    "Change",
+    "Volume"
+  ],
+  "rows": [
+    [
+      "1",
+      "FSLR",
+      "First Solar Inc",
+      "Technology",
+      "Solar",
+      "USA",
+      "31.53B",
+      "30.88",
+      "294.53",
+      "5.26%",
+      "4,099,119"
+    ],
+    [
+      "2",
+      "AAPL",
+      "Apple Inc",
+      "Technology",
+      "Consumer Electronics",
+      "USA",
+      "3176.46B",
+      "32.21",
+      "207.15",
+      "7.26%",
+      "172,010,601"
+    ]
+  ]
 }
 ```
