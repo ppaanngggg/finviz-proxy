@@ -112,8 +112,12 @@ func main() {
 			params, err := pkg.ParseTableParams(globalParams, r.URL.Query())
 			if err != nil {
 				slog.Error("parse table params", "err", err)
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(err.Error()))
+				render.Status(r, http.StatusBadRequest)
+				if pkg.IsParamsError(err) {
+					render.JSON(w, r, err)
+				} else {
+					render.PlainText(w, r, err.Error())
+				}
 				return
 			}
 			uri := params.BuildUri()
@@ -125,8 +129,12 @@ func main() {
 			params, err := pkg.ParseTableParams(globalParams, r.URL.Query())
 			if err != nil {
 				slog.Error("parse table params", "err", err)
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(err.Error()))
+				render.Status(r, http.StatusBadRequest)
+				if pkg.IsParamsError(err) {
+					render.JSON(w, r, err)
+				} else {
+					render.PlainText(w, r, err.Error())
+				}
 				return
 			}
 			uri := params.BuildUri()
@@ -154,8 +162,12 @@ func main() {
 			params, err := pkg.ParseTableParamsWithAPIKey(globalParams, r.URL.Query())
 			if err != nil {
 				slog.Error("parse elite table params", "err", err)
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(err.Error()))
+				render.Status(r, http.StatusBadRequest)
+				if pkg.IsParamsError(err) {
+					render.JSON(w, r, err)
+				} else {
+					render.PlainText(w, r, err.Error())
+				}
 				return
 			}
 			uri := params.BuildUri()

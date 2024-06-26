@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/pkg/errors"
 	"io"
 	"log/slog"
 	"strings"
@@ -77,11 +77,32 @@ func checkFilter(allowParams *Params, filter string) bool {
 	return false
 }
 
+type ParamsError struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func NewParamsError(key string, value string) *ParamsError {
+	return &ParamsError{
+		Key:   key,
+		Value: value,
+	}
+}
+
+func IsParamsError(err error) bool {
+	_, ok := err.(*ParamsError)
+	return ok
+}
+
+func (p *ParamsError) Error() string {
+	return fmt.Sprintf("%s: %s", p.Key, p.Value)
+}
+
 func ParseTableParams(allowParams *Params, query map[string][]string) (*TableParams, error) {
 	for k := range query {
 		if k != "order" && k != "desc" && k != "signal" && k != "auth" &&
 			k != "filters" && !strings.HasPrefix(k, "filters[") {
-			return nil, errors.Errorf("invalid query key: %s", k)
+			return nil, NewParamsError("invalid_key", k)
 		}
 	}
 
@@ -89,7 +110,7 @@ func ParseTableParams(allowParams *Params, query map[string][]string) (*TablePar
 	if order, ok := query["order"]; ok {
 		if len(order) > 0 {
 			if !checkSorter(allowParams, order[0]) {
-				return nil, errors.Errorf("invalid order: %s", order[0])
+				return nil, NewParamsError("invalid_order", order[0])
 			}
 			params.Order = order[0]
 		}
@@ -102,7 +123,7 @@ func ParseTableParams(allowParams *Params, query map[string][]string) (*TablePar
 	if signal, ok := query["signal"]; ok {
 		if len(signal) > 0 {
 			if !checkSignal(allowParams, signal[0]) {
-				return nil, errors.Errorf("invalid signal: %s", signal[0])
+				return nil, NewParamsError("invalid_signal", signal[0])
 			}
 			params.Signal = signal[0]
 		}
@@ -111,7 +132,7 @@ func ParseTableParams(allowParams *Params, query map[string][]string) (*TablePar
 		if k == "filters" || strings.HasPrefix(k, "filters[") {
 			for _, filter := range v {
 				if !checkFilter(allowParams, filter) {
-					return nil, errors.Errorf("invalid filter: %s", filter)
+					return nil, NewParamsError("invalid_filter", filter)
 				}
 			}
 			params.Filters = append(params.Filters, v...)
@@ -187,14 +208,14 @@ func ParseTableParamsWithAPIKey(allowParams *Params, query map[string][]string) 
 	// find apiKey from query
 	apiKeys, ok := query["auth"]
 	if !ok {
-		return nil, errors.New("apiKeys not found")
+		return nil, NewParamsError("invalid_auth", "")
 	}
 	if len(apiKeys) == 0 {
-		return nil, errors.New("apiKeys is empty")
+		return nil, NewParamsError("invalid_auth", "")
 	}
 	apiKey := apiKeys[0]
 	if apiKey == "" {
-		return nil, errors.New("apiKey is empty")
+		return nil, NewParamsError("invalid_auth", "")
 	}
 	return &TableParamsWithAPIKey{
 		TableParams: *params,
