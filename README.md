@@ -2,9 +2,9 @@
 
 🐳 **[Docker Hub](https://hub.docker.com/r/ppaanngggg/finviz-proxy) | 🐙 [RapidAPI](https://rapidapi.com/ppaanngggg/api/finviz-screener)**
 
-Finviz offers a fantastic screener application, but it lacks exposed APIs and is server-rendered. Therefore, I developed a server to fetch pages from Finviz and parse them to extract relevant information. I hope this can assist you in your financial research.
+👏 **Update 6/11/2024 - We now support login with your own [Elite](https://finviz.com/elite.ashx?a=611157936) account and can fetch Elite's real-time data.**
 
-👏 **Update 6/11/2024 - We now support login with your own [Elite](https://finviz.com/elite.ashx) account and can fetch Elite's real-time data.**
+[Finviz](https://finviz.com/?a=611157936) offers a fantastic screener application, but it lacks exposed APIs and is server-rendered. Therefore, I developed a server to fetch pages from Finviz and parse them to extract relevant information. I hope this can assist you in your financial research.
 
 ## **Usage**
 
