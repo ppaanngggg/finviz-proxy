@@ -16,6 +16,7 @@ type FilterOption struct {
 }
 
 type Filter struct {
+	Id          string         `json:"id"`
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	Options     []FilterOption `json:"options"`
@@ -181,11 +182,17 @@ func parseFilters(doc *goquery.Document) ([]Filter, error) {
 		span := spans[i]
 		selection := selections[i]
 		name, description := parseFilterNameAndDescription(span)
+		id_, ok := selection.Attr("id")
+		if !ok {
+			slog.Warn("id not found in selection", "selection", selection)
+			continue
+		}
 		if name != "" {
 			options := parseFilterOptions(selection)
 			if len(options) > 0 {
 				slog.Debug("Filter Added", "Index", i, "Name", name, "Description", description, "Options", options)
 				filters = append(filters, Filter{
+					Id:          id_,
 					Name:        name,
 					Description: description,
 					Options:     options,

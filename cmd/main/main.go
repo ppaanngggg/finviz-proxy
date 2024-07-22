@@ -157,6 +157,40 @@ func main() {
 			render.JSON(w, r, table)
 		},
 	)
+	r.Post(
+		"/table_v2", func(w http.ResponseWriter, r *http.Request) {
+			params, err := pkg.ParseTableParamsV2(globalParams, r.Body)
+			defer r.Body.Close()
+			if err != nil {
+				slog.Error("parse table params v2", "err", err)
+				render.Status(r, http.StatusBadRequest)
+				if pkg.IsParamsError(err) {
+					render.JSON(w, r, err)
+				} else {
+					render.PlainText(w, r, err.Error())
+				}
+				return
+			}
+			uri := params.BuildUri()
+			slog.Info("to fetch page", "uri", uri)
+			// check cache
+			if table, found := tableCache.Get(uri); found {
+				render.JSON(w, r, table)
+				return
+			}
+			// fetch page and parse table
+			table, err := pkg.FetchPageAndParseTable(r.Context(), uri, c.EliteLogin)
+			if err != nil {
+				slog.Error("fetch page and parse table", "err", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
+			}
+			// cache table
+			tableCache.Set(uri, table, cache.DefaultExpiration)
+			render.JSON(w, r, table)
+		},
+	)
 	r.Get(
 		"/elite_table", func(w http.ResponseWriter, r *http.Request) {
 			params, err := pkg.ParseTableParamsWithAPIKey(globalParams, r.URL.Query())

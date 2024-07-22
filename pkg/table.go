@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"io"
@@ -77,6 +78,19 @@ func checkFilter(allowParams *Params, filter string) bool {
 	return false
 }
 
+func checkFilterV2(allowParams *Params, key string, value string) bool {
+	for _, f := range allowParams.Filters {
+		if f.Id == key {
+			for _, o := range f.Options {
+				if o.Value == value {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 type ParamsError struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
@@ -137,6 +151,42 @@ func ParseTableParams(allowParams *Params, query map[string][]string) (*TablePar
 			}
 			params.Filters = append(params.Filters, v...)
 		}
+	}
+	return params, nil
+}
+
+func ParseTableParamsV2(allowParams *Params, body io.Reader) (*TableParams, error) {
+	req := &struct {
+		Order   string            `json:"order"`
+		Desc    bool              `json:"desc"`
+		Signal  string            `json:"signal"`
+		Filters map[string]string `json:"filters"`
+	}{}
+	decoder := json.NewDecoder(body)
+	err := decoder.Decode(req)
+	if err != nil {
+		slog.Error("failed to parse table params v2")
+	}
+	// build TableParams
+	params := &TableParams{}
+	if len(req.Order) > 0 {
+		if !checkSorter(allowParams, req.Order) {
+			return nil, NewParamsError("invalid_order", req.Order)
+		}
+		params.Order = req.Order
+	}
+	params.Desc = req.Desc
+	if len(req.Signal) > 0 {
+		if !checkSignal(allowParams, req.Signal) {
+			return nil, NewParamsError("invalid_signal", req.Signal)
+		}
+		params.Signal = req.Signal
+	}
+	for k, v := range req.Filters {
+		if !checkFilterV2(allowParams, k, v) {
+			return nil, NewParamsError("invalid_filter", v)
+		}
+		params.Filters = append(params.Filters, v)
 	}
 	return params, nil
 }
