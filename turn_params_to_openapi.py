@@ -18,7 +18,7 @@ from argparse import ArgumentParser
 def main(file: Path):
     data = json.loads(file.read_text())
     openapi_spec = {
-        "openapi": "3.0.0",
+        "openapi": "3.1.0",
         "info": {
             "title": "Finviz Screener API",
             "version": "1.0.0",
@@ -40,8 +40,11 @@ def main(file: Path):
                                     "properties": {
                                         "order": {
                                             "type": "string",
-                                            "enum": [
-                                                sorter["value"]
+                                            "oneOf": [
+                                                {
+                                                    "const": sorter["value"],
+                                                    "description": sorter["name"],
+                                                }
                                                 for sorter in data["sorters"]
                                             ],
                                             "description": "Sorting field",
@@ -52,8 +55,11 @@ def main(file: Path):
                                         },
                                         "signal": {
                                             "type": "string",
-                                            "enum": [
-                                                signal["value"]
+                                            "oneOf": [
+                                                {
+                                                    "const": signal["value"],
+                                                    "descriptions": signal["name"],
+                                                }
                                                 for signal in data["signals"]
                                             ],
                                             "description": "Signal to filter by",
@@ -98,13 +104,14 @@ def main(file: Path):
 
     # add filters into schema
     for filter in data["filters"]:
-        filter_id = filter["id"]
-        filter_options = [option["value"] for option in filter["options"]]
         openapi_spec["paths"]["/table_v2"]["post"]["requestBody"]["content"][
             "application/json"
-        ]["schema"]["properties"]["filters"]["properties"][filter_id] = {
+        ]["schema"]["properties"]["filters"]["properties"][filter["id"]] = {
             "type": "string",
-            "enum": filter_options,
+            "oneOf": [
+                {"const": option["value"], "description": option["name"]}
+                for option in filter["options"]
+            ],
             "description": filter["description"],
         }
 
@@ -113,7 +120,7 @@ def main(file: Path):
     with open("openapi.yaml", "w") as f:
         f.write(yaml_spec)
 
-    print("OpenAPI YAML specification has been generated and saved as 'openapi.yaml'.")
+    print("Done!")
 
 
 if __name__ == "__main__":
