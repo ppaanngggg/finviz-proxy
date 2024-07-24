@@ -54,6 +54,7 @@ curl localhost:8000/params
 {
 	"filters": [
 		{
+			"id": "fs_exch",
 			"name": "Exchange",
 			"description": "Stock Exchange at which a stock is listed.",
 			"options": [
@@ -65,6 +66,7 @@ curl localhost:8000/params
 			]
 		},
 		{
+			"id": "fs_idx",
 			"name": "Index",
 			"description": "A major index membership of a stock.",
 			"options": [
@@ -109,7 +111,7 @@ Send a `POST` request to `/table_v2` , the field of request body are:
 1. `order`: Select values from `sorters`. For example: `"order": ticker`.
 2. `desc`: Set to `true` or `false` to control the sort order. For example, `"desc": true`.
 3. `signal`: Select values from `signals`. For example, `"signal": ta_topgainers`.
-4. `filters` : Select key-value from `filters`. For example, `"fs_exch": "exch_nasd"`.
+4. `filters` : Select id and value from `filters`. For example, `"fs_exch": "exch_nasd"`.
 
 ```bash
 curl -XPOST 'http://localhost:8000/table_v2' --data '{
