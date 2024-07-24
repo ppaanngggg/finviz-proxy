@@ -2,7 +2,8 @@
 
 🐳 **[Docker Hub](https://hub.docker.com/r/ppaanngggg/finviz-proxy) | 🐙 [RapidAPI](https://rapidapi.com/ppaanngggg/api/finviz-screener)**
 
-👏 **Update 6/11/2024 - We now support login with your own [Elite](https://finviz.com/elite.ashx?a=611157936) account and can fetch Elite's real-time data.**
+- 👏 **Update 7/23/2024 - We refactor new /table_v2 API and offer python script turn params into openapi schema.**
+- 👏 **Update 6/11/2024 - We now support login with your own [Elite](https://finviz.com/elite.ashx?a=611157936) account and can fetch Elite's real-time data.**
 
 [Finviz](https://finviz.com/?a=611157936) offers a fantastic screener application, but it lacks exposed APIs and is server-rendered. Therefore, I developed a server to fetch pages from Finviz and parse them to extract relevant information. I hope this can assist you in your financial research.
 
@@ -16,9 +17,9 @@
 
 ### Serve Relative
 
-1. `PORT` (default: 8000) - the listening port.
+1. `PORT` (default: 8000) - the listening port.
 2. `TIMEOUT` (default: 60s) - this is the http client timeout.
-3. `THROTTLE` (default: 100) - this represents the maximum number of concurrent requests.
+3. `THROTTLE` (default: 100) - this represents the maximum number of concurrent requests.
 4. `CACHETTL` (default: 60s) - this is the table cache timeout.
 
 ### Elite Relative
@@ -31,7 +32,11 @@
 
 ### **1. Get Parameters**
 
+This endpoint provides all the necessary parameters to make requests to the Finviz screener.
+
 **Request:**
+
+No parameters required.
 
 ```bash
 # curl example
@@ -56,7 +61,7 @@ curl localhost:8000/params
 					"name": "AMEX",
 					"value": "exch_amex"
 				},
-        ...
+				...
 			]
 		},
 		{
@@ -91,9 +96,35 @@ curl localhost:8000/params
 
 ### **2. Get Table**
 
+This endpoint returns a structured table with the screener results based on the provided parameters.
+
+You can use any `value` from the API response of `/params` to manage your `/table` response.
+
 **Request:**
 
-Retrieve the screener table. You can use any `value` from the API response of `/params` to manage your `/table` response. The following are the available parameters:
+**🥳 New V2**
+
+Send a `POST` request to `/table_v2` , the field of request body are:
+
+1. `order`: Select values from `sorters`. For example: `"order": ticker`.
+2. `desc`: Set to `true` or `false` to control the sort order. For example, `"desc": true`.
+3. `signal`: Select values from `signals`. For example, `"signal": ta_topgainers`.
+4. `filters` : Select key-value from `filters`. For example, `"fs_exch": "exch_nasd"`.
+
+```bash
+curl -XPOST 'http://localhost:8000/table_v2' --data '{
+  "order": "ticker",
+  "desc": true,
+  "signal": "ta_topgainers",
+  "filters": {
+    "fs_exch": "exch_nasd"
+  }
+}'
+```
+
+**⛔ Deprecated V1**
+
+Send a `GET` request to `/table`. The supported parameters are:
 
 1. `order`: Select values from `sorters`. For example: `order=ticker`.
 2. `desc`: Set to `true` or `false` to control the sort order. For example, `desc=true`.
@@ -101,7 +132,6 @@ Retrieve the screener table. You can use any `value` from the API response of `/
 4. `filters`: Filters offer various options and can accept multiple values. Select values from `filters`. For instance, use `filters=exch_nasd` for a single value or `filters=exch_nasd&filters=idx_sp500` for multiple filters.
 
 ```bash
-# curl example
 curl 'localhost:8000/table?order=ticker&desc=true&signal=ta_topgainers&filters=exch_nasd&filters=idx_sp500'
 ```
 
