@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/go-chi/chi/v5"
 	"github.com/patrickmn/go-cache"
 	"github.com/ppaanngggg/finviz-proxy/pkg"
@@ -26,9 +27,10 @@ type config struct {
 }
 
 var (
-	c            config
-	globalParams *pkg.Params
-	tableCache   *cache.Cache
+	c             config
+	globalParams  *pkg.Params
+	globalFutures map[string]pkg.FutureQuota
+	tableCache    *cache.Cache
 )
 
 func init() {
@@ -83,13 +85,39 @@ func init() {
 			time.Sleep(time.Hour)
 			func() {
 				slog.Info("fetching params...")
-				params, err := pkg.FetchParams(context.Background(), c.EliteLogin)
+				ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
+				defer cancel()
+				params, err := pkg.FetchParams(ctx, c.EliteLogin)
 				if err != nil {
 					slog.Error("fetch params err", "err", err)
 					return
 				}
 				globalParams = params
 				slog.Info("fetch params success")
+			}()
+		}
+	}()
+	// fetch futures
+	func() {
+		futures, err := pkg.FetchAllFutures(context.Background(), c.EliteLogin)
+		if err != nil {
+			panic(err)
+		}
+		globalFutures = futures
+	}()
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			func() {
+				ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
+				defer cancel()
+				futures, err := pkg.FetchAllFutures(ctx, c.EliteLogin)
+				if err != nil {
+					slog.Error("fetch all futures err", "err", err)
+					return
+				}
+				globalFutures = futures
+				slog.Info("fetch all futures success")
 			}()
 		}
 	}()
@@ -101,6 +129,10 @@ func main() {
 	r.Use(middleware.Throttle(c.Throttle))
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	/*
+		stock screener apis
+	*/
 
 	r.Get(
 		"/params", func(w http.ResponseWriter, r *http.Request) {
@@ -225,6 +257,48 @@ func main() {
 		},
 	)
 
+	/*
+		futures apis
+	*/
+	r.Get("/futures/all", func(w http.ResponseWriter, r *http.Request) {
+		render.JSON(w, r, globalFutures)
+	})
+
+	r.Post("/futures", func(w http.ResponseWriter, r *http.Request) {
+		symbols := struct {
+			Symbols []string `json:"symbols"`
+		}{}
+		if err := json.NewDecoder(r.Body).Decode(&symbols); err != nil {
+			slog.Error("parse futures json", "err", err)
+			render.Status(r, http.StatusBadRequest)
+			render.PlainText(w, r, `request body should be as: {"symbols": [...]}`)
+			return
+		}
+		defer r.Body.Close()
+		// build ret
+		ret := struct {
+			Futures []pkg.FutureQuota `json:"futures"`
+		}{}
+		for _, symbol := range symbols.Symbols {
+			flag := false
+			for _, v := range globalFutures {
+				if v.Label == symbol {
+					ret.Futures = append(ret.Futures, v)
+					flag = true
+					break
+				}
+			}
+			if !flag {
+				slog.Error("can't find symbol in all futures", "symbol", symbol)
+				render.Status(r, http.StatusBadRequest)
+				render.PlainText(w, r, "can't find symbol: "+symbol)
+				return
+			}
+		}
+		render.JSON(w, r, ret)
+	})
+
+	// start serve
 	addr := ":" + strconv.Itoa(c.Port)
 	slog.Info("Listening on", "addr", addr)
 	http.ListenAndServe(addr, r)
