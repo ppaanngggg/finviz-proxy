@@ -140,23 +140,6 @@ func main() {
 		},
 	)
 	r.Get(
-		"/filter", func(w http.ResponseWriter, r *http.Request) {
-			params, err := pkg.ParseTableParams(globalParams, r.URL.Query())
-			if err != nil {
-				slog.Error("parse table params", "err", err)
-				render.Status(r, http.StatusBadRequest)
-				if pkg.IsParamsError(err) {
-					render.JSON(w, r, err)
-				} else {
-					render.PlainText(w, r, err.Error())
-				}
-				return
-			}
-			uri := params.BuildUri()
-			render.PlainText(w, r, uri)
-		},
-	)
-	r.Get(
 		"/table", func(w http.ResponseWriter, r *http.Request) {
 			params, err := pkg.ParseTableParams(globalParams, r.URL.Query())
 			if err != nil {
@@ -223,43 +206,11 @@ func main() {
 			render.JSON(w, r, table)
 		},
 	)
-	r.Get(
-		"/elite_table", func(w http.ResponseWriter, r *http.Request) {
-			params, err := pkg.ParseTableParamsWithAPIKey(globalParams, r.URL.Query())
-			if err != nil {
-				slog.Error("parse elite table params", "err", err)
-				render.Status(r, http.StatusBadRequest)
-				if pkg.IsParamsError(err) {
-					render.JSON(w, r, err)
-				} else {
-					render.PlainText(w, r, err.Error())
-				}
-				return
-			}
-			uri := params.BuildUri()
-			slog.Info("to fetch elite table", "uri", uri)
-			// check cache
-			if table, found := tableCache.Get(uri); found {
-				render.JSON(w, r, table)
-				return
-			}
-			// fetch csv
-			table, err := pkg.ExportTable(r.Context(), uri)
-			if err != nil {
-				slog.Error("export table", "err", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
-				return
-			}
-			// cache table
-			tableCache.Set(uri, table, cache.DefaultExpiration)
-			render.JSON(w, r, table)
-		},
-	)
 
 	/*
 		futures apis
 	*/
+
 	r.Get("/futures/all", func(w http.ResponseWriter, r *http.Request) {
 		render.JSON(w, r, globalFutures)
 	})

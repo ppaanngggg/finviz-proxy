@@ -3,7 +3,6 @@ package pkg
 import (
 	"bytes"
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
@@ -241,70 +240,6 @@ func FetchPageAndParseTable(ctx context.Context, uri string, isElite bool) (*Tab
 	if err != nil {
 		slog.Error("failed to parse table", "err", err)
 		return nil, err
-	}
-	return table, nil
-}
-
-type TableParamsWithAPIKey struct {
-	TableParams
-	ApiKey string `json:"apiKey"`
-}
-
-func ParseTableParamsWithAPIKey(allowParams *Params, query map[string][]string) (*TableParamsWithAPIKey, error) {
-	params, err := ParseTableParams(allowParams, query)
-	if err != nil {
-		return nil, err
-	}
-	// find apiKey from query
-	apiKeys, ok := query["auth"]
-	if !ok {
-		return nil, NewParamsError("invalid_auth", "")
-	}
-	if len(apiKeys) == 0 {
-		return nil, NewParamsError("invalid_auth", "")
-	}
-	apiKey := apiKeys[0]
-	if apiKey == "" {
-		return nil, NewParamsError("invalid_auth", "")
-	}
-	return &TableParamsWithAPIKey{
-		TableParams: *params,
-		ApiKey:      apiKey,
-	}, nil
-}
-
-func (p *TableParamsWithAPIKey) BuildUri() string {
-	ret := p.TableParams.BuildUri()
-	if ret != "" {
-		ret += "&"
-	}
-	ret += "auth=" + p.ApiKey
-	return ret
-}
-
-func ExportTable(ctx context.Context, uri string) (*Table, error) {
-	// fetch csv
-	csvBytes, err := fetchExportCSV(ctx, uri)
-	if err != nil {
-		slog.Error("failed to fetch csv", "err", err)
-		return nil, err
-	}
-	// parse table
-	r := csv.NewReader(bytes.NewReader(csvBytes))
-	table := &Table{}
-	for {
-		record, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			slog.Error("failed to read csv", "err", err)
-		}
-		if len(table.Headers) == 0 {
-			table.Headers = record
-		} else {
-			table.Rows = append(table.Rows, record)
-		}
 	}
 	return table, nil
 }
