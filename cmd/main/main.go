@@ -30,6 +30,8 @@ var (
 	c             config
 	globalParams  *pkg.Params
 	globalFutures map[string]pkg.FutureQuota
+	globalNews    []pkg.Record
+	globalBlogs   []pkg.Record
 	tableCache    *cache.Cache
 )
 
@@ -118,6 +120,32 @@ func init() {
 				}
 				globalFutures = futures
 				slog.Info("fetch all futures success")
+			}()
+		}
+	}()
+	// fetch news and blogs
+	func() {
+		news, blogs, err := pkg.FetchAndParseNewsAndBlogs(context.Background(), c.EliteLogin)
+		if err != nil {
+			panic(err)
+		}
+		globalNews = news
+		globalBlogs = blogs
+	}()
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+			func() {
+				ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
+				defer cancel()
+				news, blogs, err := pkg.FetchAndParseNewsAndBlogs(ctx, c.EliteLogin)
+				if err != nil {
+					slog.Error("fetch all news and blogs err", "err", err)
+					return
+				}
+				globalNews = news
+				globalBlogs = blogs
+				slog.Info("fetch all news and blogs success")
 			}()
 		}
 	}()
@@ -246,6 +274,26 @@ func main() {
 				return
 			}
 		}
+		render.JSON(w, r, ret)
+	})
+
+	/*
+		news and blogs api
+	*/
+
+	r.Get("/news", func(w http.ResponseWriter, r *http.Request) {
+		ret := struct {
+			News []pkg.Record `json:"news"`
+		}{}
+		ret.News = globalNews
+		render.JSON(w, r, ret)
+	})
+
+	r.Get("/blogs", func(w http.ResponseWriter, r *http.Request) {
+		ret := struct {
+			Blogs []pkg.Record `json:"blogs"`
+		}{}
+		ret.Blogs = globalBlogs
 		render.JSON(w, r, ret)
 	})
 
