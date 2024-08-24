@@ -18,10 +18,6 @@ func Test_parseNewsAndBlogs(t *testing.T) {
 	assert.NoError(t, err)
 	news, blogs, err := parseNewsAndBlogs(html)
 	assert.NoError(t, err)
-	for _, new_ := range news {
-		println(new_.Title)
-	}
-	for _, blog := range blogs {
-		println(blog.Title)
-	}
+	assert.NotEmpty(t, news)
+	assert.NotEmpty(t, blogs)
 }

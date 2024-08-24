@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
+	"time"
 )
 
 func fetchAllNews(ctx context.Context, isElite bool) ([]byte, error) {
@@ -41,19 +43,31 @@ func fetchAllNews(ctx context.Context, isElite bool) ([]byte, error) {
 }
 
 type Record struct {
+	Date  string `json:"date"` // Jan-02 2006
 	Title string `json:"title"`
 	URL   string `json:"url"`
 }
 
 func parseLinks(table *goquery.Selection) []Record {
+	loc, _ := time.LoadLocation("America/New_York")
+	today := time.Now().UTC().In(loc)
 	var records []Record
-	table.Find("a").Each(func(i int, a *goquery.Selection) {
+	table.Find("tr.news_table-row").Each(func(i int, tr *goquery.Selection) {
+		a := tr.Find("a")
 		href, exists := a.Attr("href")
 		if !exists {
 			return
 		}
+		date := strings.TrimSpace(tr.Find("td.news_date-cell").Text())
+		if strings.HasSuffix(date, "AM") || strings.HasSuffix(date, "PM") {
+			// if 05:30AM, format today
+			date = today.Format("Jan-02 2006")
+		} else {
+			date += " " + today.Format("2006") // add year
+		}
 		text := a.Text()
 		records = append(records, Record{
+			Date:  date,
 			Title: text,
 			URL:   href,
 		})
