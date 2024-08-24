@@ -2,6 +2,8 @@
 
 🐳 **[Docker Hub](https://hub.docker.com/r/ppaanngggg/finviz-proxy) | 🐙 [RapidAPI](https://rapidapi.com/ppaanngggg/api/finviz-screener)**
 
+- 👏 **Update 8/24/2024 - We now support fetch latest news and blogs from page.**
+- 👏 **Update 8/12/2024 - We now support fetch futures list by /futures/all.**
 - 👏 **Update 7/23/2024 - We refactor new /table_v2 API and offer python script turn params into openapi schema.**
 - 👏 **Update 6/11/2024 - We now support login with your own [Elite](https://finviz.com/elite.ashx?a=611157936) account and can fetch Elite's real-time data.**
 
