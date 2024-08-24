@@ -14,6 +14,8 @@ RUN go build -o main cmd/main/main.go
 
 FROM alpine:3.18 AS final
 
+RUN apk add --no-cache tzdata
+
 WORKDIR /app
 COPY --from=builder /app/main /app/main
 
