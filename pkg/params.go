@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/pkg/errors"
+	"html"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -79,8 +80,8 @@ func parseFilterNameAndDescription(span *goquery.Selection) (name string, descri
 	*/
 	dataBoxover, exist := span.Attr("data-boxover")
 	if !exist {
-		html, err := span.Html()
-		slog.Warn("data-boxover not found in span", "span", html, "err", err)
+		ret, err := span.Html()
+		slog.Warn("data-boxover not found in span", "span", ret, "err", err)
 		return
 	}
 	m := parseKeyValuePairs(dataBoxover)
@@ -88,7 +89,7 @@ func parseFilterNameAndDescription(span *goquery.Selection) (name string, descri
 	name = m["header"]
 	if name == "" {
 		// if header not found, use span text
-		name = span.Text()
+		name = html.UnescapeString(span.Text())
 	}
 	// parse body to get description
 	body := m["body"]
@@ -109,7 +110,7 @@ func parseFilterNameAndDescription(span *goquery.Selection) (name string, descri
 		slog.Warn("td not found in body", "body", body)
 		return
 	}
-	description = td.Text()
+	description = html.UnescapeString(td.Text())
 	return
 }
 
@@ -130,15 +131,15 @@ func parseFilterOptions(selection *goquery.Selection) []FilterOption {
 	// extract data-filter as prefix
 	prefix, exist := selection.Attr("data-filter")
 	if !exist {
-		html, err := selection.Html()
-		slog.Warn("data-filter not found in selection", "selection", html, "err", err)
+		ret, err := selection.Html()
+		slog.Warn("data-filter not found in selection", "selection", ret, "err", err)
 		return nil
 	}
 	// iter options of select
 	options := make([]FilterOption, 0)
 	selection.Find("option").Each(func(i int, option *goquery.Selection) {
 		// <option value="amex">AMEX</option>
-		name := option.Text()
+		name := html.UnescapeString(option.Text())
 		if name == "Any" || name == "Custom (Elite only)" { // ignore Any and Custom (Elite only)
 			return
 		}
@@ -206,7 +207,7 @@ func parseFilters(doc *goquery.Document) ([]Filter, error) {
 func parseSorters(doc *goquery.Document) ([]Sorter, error) {
 	sorters := make([]Sorter, 0)
 	doc.Find("select#orderSelect option").Each(func(i int, option *goquery.Selection) {
-		name := option.Text()
+		name := html.UnescapeString(option.Text())
 		value, exists := option.Attr("value")
 		if !exists {
 			return
@@ -226,7 +227,7 @@ func parseSorters(doc *goquery.Document) ([]Sorter, error) {
 func parseSignals(doc *goquery.Document) ([]Signal, error) {
 	signals := make([]Signal, 0)
 	doc.Find("select#signalSelect option").Each(func(i int, option *goquery.Selection) {
-		name := option.Text()
+		name := html.UnescapeString(option.Text())
 		if name == "None (all stocks)" {
 			return
 		}
