@@ -109,7 +109,7 @@ func init() {
 	}()
 	go func() {
 		for {
-			time.Sleep(10 * time.Second)
+			time.Sleep(time.Minute)
 			func() {
 				ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
 				defer cancel()
