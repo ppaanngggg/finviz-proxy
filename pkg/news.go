@@ -91,6 +91,9 @@ func parseNewsAndBlogs(page []byte) ([]Record, []Record, error) {
 			blogsTable = s
 		}
 	})
+	if newsTable == nil || blogsTable == nil {
+		return nil, nil, errors.New("failed to find news and blogs tables")
+	}
 	return parseLinks(newsTable), parseLinks(blogsTable), nil
 }
 
